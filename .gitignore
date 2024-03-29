@@ -1,0 +1,6 @@
+discogstoken
+discogstoken2
+*
+!.gitignore
+!recordr.py
+!config.json

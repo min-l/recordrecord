@@ -1,0 +1,6 @@
+{
+    "time_before_song": 0.4,
+    "silence_threshold": -30,
+    "file_format": "mp3",
+    "file_extension": ".mp3"
+}
