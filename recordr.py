@@ -10,6 +10,7 @@ import os
 import json
 from ffmpeg import FFmpeg
 from tkinter import *
+from tkinter import filedialog
 from tkinter import ttk
 import webbrowser
 
@@ -205,6 +206,7 @@ def clver():
         #os.replace("reencode" + str(i) + FE,str(first_track_no + i).zfill(2) + ' ' + track.title + ' - ' + o_album_artist + FE)
 
 def searchio():
+    search_button.state(['disabled'])
     feedback.set("Searching, please wait warmly...")
     recordr.after(10,search_start)
 
@@ -226,25 +228,6 @@ def search_start(*args):
     recordr.after(10,search_continue)
 
 
-'''
-
-    for result in results:
-        #print(result)
-        if found == False:
-            if len(d.identity().collection_items(result.id)) > 0:
-                found = True
-                collection_text = ' <<IN COLLECTION>>'
-            else:
-                collection_text = ' <<NOT FOUND>>'
-        feedback.set(str(i) + ' ==> ' + result.labels[0].catno + ': ' + result.artists[0].name + ' - ' + result.title + ' (' + result.country + ') - ' + result.formats[0]['name'] + ' - Discogs url: https://www.discogs.com/release/' + str(result.id) + collection_text)
-        resulttext.append(str(i) + ' ==> ' + result.labels[0].catno + ': ' + result.artists[0].name + ' - ' + result.title + ' (' + result.country + ') - ' + result.formats[0]['name'] + collection_text)
-        resulthl.append('https://www.discogs.com/release/' + str(result.id))
-        #print(result.country)
-        #print(result.formats[0]['name'])
-        i += 1
-        collection_text = ' <<UNCHECKED>>'
-    sresults['values'] = resulttext
-    '''
 
 def search_continue():
     global i,found,resulthl,resulttext
@@ -261,7 +244,7 @@ def search_continue():
                 collection_text = ' <<NOT FOUND>>'
         feedback.set("Progress: " + str(round( ((i+1) / len(results)) * 100 )) + "%")
         resulttext.append(str(i) + ' ==> ' + result.labels[0].catno + ': ' + result.artists[0].name + ' - ' + result.title + ' (' + result.country + ') - ' + result.formats[0]['name'] + collection_text)
-        resulthl.append('https://www.discogs.com/release/' + str(result.id))
+        resulthl.append(result.id)
         #print(result.country)
         #print(result.formats[0]['name'])
         i += 1
@@ -270,6 +253,20 @@ def search_continue():
     else:
         feedback.set("Search done")
         sresults['values'] = resulttext
+        search_button.state(['!disabled'])
+
+def hyperlink_update(*args):
+    sresults.selection_clear()
+    link_address.set("https://www.discogs.com/release/" + str(resulthl[resulttext.index(sresultvar.get())]))
+    #https://www.discogs.com/release/
+    result_link.bind("<Button-1>", lambda e: open_link(link_address.get()))
+
+def open_link(url):
+    webbrowser.open_new(url)
+
+def file_browse():
+    filename = filedialog.askopenfilename()
+    filenamevar.set(filename)
 
 
 with open("discogstoken2",'r') as token_file:
@@ -305,7 +302,8 @@ search_entry.grid(column=2,row=3,sticky=(W,E))
 finish_early = BooleanVar(value=True)
 finish_early_check = ttk.Checkbutton(uframe,text="Stop searching when found",variable=finish_early)
 finish_early_check.grid(column=1,row=4,sticky=(W,E))
-ttk.Button(uframe,text="Search",command=searchio).grid(column=2,row=4,sticky=(W,E))
+search_button = ttk.Button(uframe,text="Search",command=searchio)
+search_button.grid(column=2,row=4,sticky=(W,E))
 
 #search results
 sresultvar = StringVar()
@@ -313,9 +311,33 @@ sresults = ttk.Combobox(uframe,textvariable=sresultvar)
 sresults.state(["readonly"])
 sresults.grid(row=5,column=1,columnspan=3,sticky=(W,E))
 
+sresults.bind('<<ComboboxSelected>>',hyperlink_update)
+
+
+link_address = StringVar()
+result_link = ttk.Label(uframe,textvariable=link_address,foreground="blue",cursor="hand2")
+result_link.grid(row=6,column=1,columnspan=2,sticky=(W,E))
+
+
+
+#divider
+ttk.Separator(uframe,orient=HORIZONTAL).grid(row=10,column=1,columnspan=3,sticky=(W,E))
+
+#file
+ttk.Label(uframe,text="Recording file").grid(column=1,row=11,sticky=(W,E))
+filenamevar = StringVar()
+filename_entry = ttk.Entry(uframe,width=40,textvariable=filenamevar)
+filename_entry.grid(column=1,row=12,columnspan=3,sticky=(W,E))
+
+ttk.Button(uframe,text="Browse",command=file_browse).grid(row=11,column=2,columnspan=1,sticky=(W,E))
+
+
+
+#divider
+ttk.Separator(uframe,orient=HORIZONTAL).grid(row=20,column=1,columnspan=3,sticky=(W,E))
 
 #progress
-ttk.Label(uframe,textvariable=feedback).grid(column=1,row=8,columnspan=3,sticky=(W))
+ttk.Label(uframe,textvariable=feedback).grid(column=1,row=21,columnspan=3,sticky=(W))
 
 
 
