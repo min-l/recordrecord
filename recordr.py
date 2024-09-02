@@ -149,8 +149,21 @@ o_comment = 'Vinyl Rip'
 o_genre = album.genres[0]
 '''
 url = album.images[0]['uri']
-urllib.request.urlretrieve(url,"albumart.jpg")
+#urllib.request.urlretrieve(url,"albumart.jpg")
+#r = requests.get(url)
+#with open('albumart.jpg', 'wb') as albumfile:
+#    albumfile.write(r.content)
 
+try:
+    opener = urllib.request.URLopener()
+    opener.addheader('User-Agent', 'minty metadata automate')
+    filename, headers = opener.retrieve(url, 'albumart.jpg')
+except:
+    print("Failed to retrieve album art. Please download the following image and save it in the same folder as albumart.jpg")
+    print(url)
+    whocares = input("Press enter when done")
+
+    
 
 for i in range(0,len(side_tracklist)):
     print('Tagging file ('+str(i+1) + '/' + str(len(side_tracklist)) + ')... ',end='')
