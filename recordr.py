@@ -14,15 +14,20 @@ from tkinter import filedialog
 from tkinter import ttk
 import webbrowser
 
-with open("config.json","r") as config_file:
-    config = json.loads(config_file.read())
 
-TBS = config["time_before_song"]
-ST = config["silence_threshold"]
-FF = config["file_format"]
-FE = config["file_extension"]
+try:
+    with open("config.json","r") as config_file:
+        config = json.loads(config_file.read())
 
-
+    TBS = config["time_before_song"]
+    ST = config["silence_threshold"]
+    FF = config["file_format"]
+    FE = config["file_extension"]
+except:
+    TBS = 0.4
+    ST = -30
+    FF = "mp3"
+    FE = ".mp3"
 
 
 
@@ -268,9 +273,15 @@ def file_browse():
     filename = filedialog.askopenfilename()
     filenamevar.set(filename)
 
+def find_breaks():
+    pass
 
-with open("discogstoken2",'r') as token_file:
-    token = token_file.read().strip()
+
+try:
+    with open("discogstoken2",'r') as token_file:
+        token = token_file.read().strip()
+except:
+    token = ""
 
 
 
@@ -331,7 +342,19 @@ filename_entry.grid(column=1,row=12,columnspan=3,sticky=(W,E))
 
 ttk.Button(uframe,text="Browse",command=file_browse).grid(row=11,column=2,columnspan=1,sticky=(W,E))
 
+#gaps
+ttk.Label(uframe,text="Time before song").grid(column=1,row=13,sticky=(W,E))
+tbs_var = StringVar()
+tbs_var.set(str(TBS))
+ttk.Spinbox(uframe,from_=0.0, to=5.0,textvariable=tbs_var,increment=0.1).grid(column=2,row=13,sticky=(W,E))
 
+ttk.Label(uframe,text="Silence threshold").grid(column=1,row=14,sticky=(W,E))
+st_var = StringVar()
+st_var.set(str(ST))
+ttk.Spinbox(uframe,from_=-100, to=0,textvariable=st_var,increment=1).grid(column=2,row=14,sticky=(W,E))
+
+
+ttk.Button(uframe,text="Find breaks in file",command=find_breaks).grid(row=15,column=1,columnspan=2,sticky=(W,E))
 
 #divider
 ttk.Separator(uframe,orient=HORIZONTAL).grid(row=20,column=1,columnspan=3,sticky=(W,E))
