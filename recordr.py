@@ -261,10 +261,12 @@ def search_continue():
         search_button.state(['!disabled'])
 
 def hyperlink_update(*args):
+    #global album,d,tracklist
     sresults.selection_clear()
     link_address.set("https://www.discogs.com/release/" + str(resulthl[resulttext.index(sresultvar.get())]))
     #https://www.discogs.com/release/
     result_link.bind("<Button-1>", lambda e: open_link(link_address.get()))
+
 
 def open_link(url):
     webbrowser.open_new(url)
@@ -274,7 +276,92 @@ def file_browse():
     filenamevar.set(filename)
 
 def find_breaks():
-    pass
+    try:
+        float(tbs_var.get())
+        float(st_var.get())
+        feedback.set("Now finding breaks. Please wait warmly...")
+        recordr.after(10,breaks_process)
+    except:
+        feedback.set("Time before song and silence threshold must be numbers")
+
+def breaks_process():
+    global silencelist
+    filename = filenamevar.get()
+    ST = st_var.get()
+
+    recordfile = AudioSegment.from_file(filename)
+
+    silencelist = silence.detect_silence(recordfile, min_silence_len=1000, silence_thresh=ST, seek_step=10)
+
+    silencelist = [((start/1000),(stop/1000)) for start,stop in silencelist] #convert to sec
+    
+    feedback.set("Done")
+
+    readable_sl = []
+    for j,s in enumerate(silencelist):
+        readable_sl.append(str(j) + ': ' + str(s[0]) + 's (' + str(int(s[0])//60) + 'm ' + str(int(s[0]) % 60) +'s) - Gap duration: ' + str(round(s[1],2)) + 's')
+    breaksvar.set(readable_sl)
+
+def side_update():
+    global album,d,tracklist,side_tracklist
+
+    side_box.selection_clear()
+    try:
+        album_id = resulthl[resulttext.index(sresultvar.get())]
+    except:
+        feedback.set("No album selected")
+    else:
+        album = d.release(album_id)
+        tracklist = album.tracklist
+
+        if tracklist[0].position != 'A1':
+            print('something is wrong?')
+
+        side = sidevar.get()
+        #while side != 'A' and side != 'B':
+        #    side = input('Select side (A or B) >').upper()
+
+        side_tracklist = []
+        if side in 'ABCD':
+            first_track_no = -1
+            c_track_no = 1
+            for track in tracklist:
+                if track.position[0] == side:
+                    side_tracklist.append(track)
+                    if first_track_no == -1:
+                        first_track_no = c_track_no
+                c_track_no += 1
+        elif side == "One Side":
+            for track in tracklist:
+                side_tracklist.append(track)
+        elif side == "Single (Side A)":
+            i = 0
+            for track in tracklist:
+                if i == 0:
+                    side_tracklist.append(track)
+                    i += 1
+        elif side == "Single (Side B)":
+            i = 0
+            for track in tracklist:
+                if i == 1:
+                    side_tracklist.append(track)
+                i += 1
+        else:
+            try:
+                starttrack = int(side.split("-")[0].strip())
+                endtrack = int(side.split("-")[1].strip())
+            except:
+                starttrack = 1
+                endtrack = 1
+                feedback.set("Invalid side format")
+            i = 1
+            for track in tracklist:
+                if i >= starttrack and i <= endtrack:
+                    side_tracklist.append(track)
+                i += 1
+        song_numvar.set("Songs found: " + str(len(side_tracklist)))
+        for track in side_tracklist:
+            print(track)
 
 
 try:
@@ -320,7 +407,7 @@ search_button.grid(column=2,row=4,sticky=(W,E))
 sresultvar = StringVar()
 sresults = ttk.Combobox(uframe,textvariable=sresultvar)
 sresults.state(["readonly"])
-sresults.grid(row=5,column=1,columnspan=3,sticky=(W,E))
+sresults.grid(row=5,column=1,columnspan=2,sticky=(W,E))
 
 sresults.bind('<<ComboboxSelected>>',hyperlink_update)
 
@@ -330,15 +417,28 @@ result_link = ttk.Label(uframe,textvariable=link_address,foreground="blue",curso
 result_link.grid(row=6,column=1,columnspan=2,sticky=(W,E))
 
 
+#side
+ttk.Label(uframe,text="Side").grid(row=7,column=1,sticky=(W,E))
+sidevar = StringVar()
+side_box = ttk.Combobox(uframe,textvariable=sidevar)
+#side_box.state(["readonly"])
+side_box.grid(row=7,column=2,sticky=(W,E))
+side_box['values'] = ['A','B','C','D','One Side','Single (Side A)','Single (Side B)']
+
+#sresults.bind('<<ComboboxSelected>>',side_update)
+
+
+ttk.Button(uframe,text="Update Song Information",command=side_update).grid(row=8,column=1,columnspan=2,sticky=(W,E))
+
 
 #divider
-ttk.Separator(uframe,orient=HORIZONTAL).grid(row=10,column=1,columnspan=3,sticky=(W,E))
+ttk.Separator(uframe,orient=HORIZONTAL).grid(row=10,column=1,columnspan=2,sticky=(W,E))
 
 #file
 ttk.Label(uframe,text="Recording file").grid(column=1,row=11,sticky=(W,E))
 filenamevar = StringVar()
 filename_entry = ttk.Entry(uframe,width=40,textvariable=filenamevar)
-filename_entry.grid(column=1,row=12,columnspan=3,sticky=(W,E))
+filename_entry.grid(column=1,row=12,columnspan=2,sticky=(W,E))
 
 ttk.Button(uframe,text="Browse",command=file_browse).grid(row=11,column=2,columnspan=1,sticky=(W,E))
 
@@ -356,11 +456,27 @@ ttk.Spinbox(uframe,from_=-100, to=0,textvariable=st_var,increment=1).grid(column
 
 ttk.Button(uframe,text="Find breaks in file",command=find_breaks).grid(row=15,column=1,columnspan=2,sticky=(W,E))
 
+#breaks results
+song_numvar = StringVar()
+song_numvar.set("Update song information to see track data")
+ttk.Label(uframe,textvariable=song_numvar).grid(row=2,column=5,sticky=(W,E))
+
+breaksvar = StringVar()
+breaks_listbox = Listbox(uframe,height=14,width=45,listvariable=breaksvar,selectmode=EXTENDED)
+breaks_listbox.grid(column=5,row=3,rowspan=18,sticky=(W,E,N,S))
+
+
+#GO!!!!!!!!!!!!!!!
+gobutton = ttk.Button(uframe,text="Process",command=print)
+gobutton.grid(column=5,row=21,sticky=(W,E))
+gobutton.state(['disabled'])
+
+
 #divider
-ttk.Separator(uframe,orient=HORIZONTAL).grid(row=20,column=1,columnspan=3,sticky=(W,E))
+ttk.Separator(uframe,orient=HORIZONTAL).grid(row=20,column=1,columnspan=2,sticky=(W,E))
 
 #progress
-ttk.Label(uframe,textvariable=feedback).grid(column=1,row=21,columnspan=3,sticky=(W))
+ttk.Label(uframe,textvariable=feedback).grid(column=1,row=21,columnspan=2,sticky=(W))
 
 
 
