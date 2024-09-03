@@ -285,7 +285,7 @@ def find_breaks():
         feedback.set("Time before song and silence threshold must be numbers")
 
 def breaks_process():
-    global silencelist
+    global silencelist,recordfile,next_silence
     filename = filenamevar.get()
     ST = st_var.get()
 
@@ -295,15 +295,18 @@ def breaks_process():
 
     silencelist = [((start/1000),(stop/1000)) for start,stop in silencelist] #convert to sec
     
+    silencelist.insert(0,(0.0,0.0))
+
     feedback.set("Done")
 
     readable_sl = []
-    for j,s in enumerate(silencelist):
+    next_silence = [(stop,stop-start) for start,stop in silencelist]
+    for j,s in enumerate(next_silence):
         readable_sl.append(str(j) + ': ' + str(s[0]) + 's (' + str(int(s[0])//60) + 'm ' + str(int(s[0]) % 60) +'s) - Gap duration: ' + str(round(s[1],2)) + 's')
     breaksvar.set(readable_sl)
 
 def side_update():
-    global album,d,tracklist,side_tracklist
+    global album,d,tracklist,side_tracklist,first_track_no
 
     side_box.selection_clear()
     try:
@@ -332,15 +335,18 @@ def side_update():
                         first_track_no = c_track_no
                 c_track_no += 1
         elif side == "One Side":
+            first_track_no = 1
             for track in tracklist:
                 side_tracklist.append(track)
         elif side == "Single (Side A)":
+            first_track_no = 1
             i = 0
             for track in tracklist:
                 if i == 0:
                     side_tracklist.append(track)
                     i += 1
         elif side == "Single (Side B)":
+            first_track_no = 2
             i = 0
             for track in tracklist:
                 if i == 1:
@@ -350,9 +356,11 @@ def side_update():
             try:
                 starttrack = int(side.split("-")[0].strip())
                 endtrack = int(side.split("-")[1].strip())
+                first_track_no = starttrack
             except:
                 starttrack = 1
                 endtrack = 1
+                first_track_no = 1
                 feedback.set("Invalid side format")
             i = 1
             for track in tracklist:
@@ -362,6 +370,107 @@ def side_update():
         song_numvar.set("Songs found: " + str(len(side_tracklist)))
         for track in side_tracklist:
             print(track)
+
+
+def songnumber_update(*args):
+    global side_tracklist
+    print(breaks_listbox.curselection())
+    try:
+        song_numvar.set("Selected: " + str(len(breaks_listbox.curselection())) + "/" + str(len(side_tracklist)))
+        if len(breaks_listbox.curselection()) == len(side_tracklist):
+            gobutton.state(['!disabled'])
+        else:
+            gobutton.state(['disabled'])
+    except:
+        song_numvar.set("Selected: " + str(len(breaks_listbox.curselection())))
+        gobutton.state(['disabled'])
+
+def metadata_io(*args):
+    recordr.after(10,metadata_process)
+
+def metadata_process():
+    global side_tracklist,next_silence,silencelist,recordfile
+
+
+    TBS = float(tbs_var.get())
+    
+    song_starts = []
+
+    for sel in breaks_listbox.curselection():
+        #mus_position = next_silence[sel][0]
+        #song_starts.append(mus_position)
+        song_starts.append(next_silence[sel][0])
+
+    
+    
+
+    song_starts = [song - TBS for song in song_starts]
+
+    #song_starts.insert(0,0.0)
+    if song_starts[0] < 0.0:
+        song_starts[0] = 0.0 
+
+    print(song_starts)
+    for i in range(0,len(song_starts) - 1):
+        song_audio = recordfile[song_starts[i]*1000:song_starts[i+1]*1000]
+        song_audio.export(str(i) + FE,format=FF)
+
+
+    song_audio = recordfile[song_starts[len(song_starts) - 1]*1000:]
+    song_audio.export(str(len(song_starts) - 1) + FE,format=FF)
+
+    o_album_artist = ''
+    for artist in album.artists:
+        o_album_artist += artist.name
+        if artist.join != '':
+            o_album_artist += ' ' + artist.join + ' '
+
+    url = album.images[0]['uri']
+    #urllib.request.urlretrieve(url,"albumart.jpg")
+    #r = requests.get(url)
+    #with open('albumart.jpg', 'wb') as albumfile:
+    #    albumfile.write(r.content)
+
+    try:
+        opener = urllib.request.URLopener()
+        opener.addheader('User-Agent', 'minty metadata automate')
+        filename, headers = opener.retrieve(url, 'albumart.jpg')
+    except:
+        print("Failed to retrieve album art. Please download the following image and save it in the same folder as albumart.jpg")
+        print(url)
+        whocares = input("Press enter when done")
+
+        
+
+    for i in range(0,len(side_tracklist)):
+        print('Tagging file ('+str(i+1) + '/' + str(len(side_tracklist)) + ')... ',end='')
+        s = music_tag.load_file(str(i) + FE)
+        track = side_tracklist[i]
+        s['tracktitle'] = track.title
+        s['album'] = album.title
+        s['artist'] = o_album_artist
+        s['albumartist'] = o_album_artist
+        s['year'] = album.year
+        s['genre'] = album.genres[0]
+        s['tracknumber'] = first_track_no + i
+        s['totaltracks'] = len(album.tracklist)
+        with open('albumart.jpg','rb') as img_in:
+            s['artwork'] = img_in.read()
+        #s['artwork'].first.thumbnail([64,64])
+        #s['artwork'].first.raw_thumbnail([64,64])
+        s.save()
+
+
+        # check varibale bit rate if ths doesn't fix it
+        
+        ffmpeg = (
+            FFmpeg()
+            .input(str(i) + FE)
+            .output(str(first_track_no + i).zfill(2) + ' ' + track.title + ' - ' + o_album_artist + FE)
+        )
+        ffmpeg.execute()
+        os.remove(str(i) + FE)
+        print('Done.')
 
 
 try:
@@ -465,9 +574,11 @@ breaksvar = StringVar()
 breaks_listbox = Listbox(uframe,height=14,width=45,listvariable=breaksvar,selectmode=EXTENDED)
 breaks_listbox.grid(column=5,row=3,rowspan=18,sticky=(W,E,N,S))
 
+breaks_listbox.bind("<<ListboxSelect>>",songnumber_update)
+
 
 #GO!!!!!!!!!!!!!!!
-gobutton = ttk.Button(uframe,text="Process",command=print)
+gobutton = ttk.Button(uframe,text="Process",command=metadata_io)
 gobutton.grid(column=5,row=21,sticky=(W,E))
 gobutton.state(['disabled'])
 
