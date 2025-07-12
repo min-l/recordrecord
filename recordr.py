@@ -333,7 +333,7 @@ def metadata_process():
         ffmpeg = (
             FFmpeg()
             .input(str(i) + FE)
-            .output(str(first_track_no + i).zfill(2) + ' ' + track.title + ' - ' + o_album_artist + FE)
+            .output(str(first_track_no + i).zfill(2) + ' ' + "".join([c for c in track.title if c not in "\\/:*?\"<>|"]) + ' - ' + o_album_artist + FE)
         )
         ffmpeg.execute()
         os.remove(str(i) + FE)
